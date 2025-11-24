@@ -86,18 +86,20 @@ def get_all_steps_status(tool_context: ToolContext) -> Dict[str, Any]:
 def mcp_db_tool():
     load_dotenv()
     DATABASE = os.getenv("DATABASE_NAME")
-    conf={
-    "mcpServers": {
-        "MCP SQLite Server": {
-            "command": "npx",
-            "args": [
-                "-y",
-                "mcp-sqlite",
-                "<path-to-your-sqlite-database.db>" #this should be changed later.
-            ]
-        }
-    }
-}
+    conf=[McpToolset(
+            connection_params=StdioConnectionParams(
+                server_params=StdioServerParameters(
+                    command="npx",
+                    args=[
+                        "-y",
+                        "@modelcontextprotocol/server-sqlite",
+                        "local_addb",
+                    ],
+                )
+            ),
+            
+        )]
+
     return conf
     
 

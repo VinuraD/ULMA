@@ -23,7 +23,7 @@ def create_db():
     apps                  
     )
     ''')
-    cursor.commit()
+    conn.commit()
     conn.close()
     print('New Table(user) created...')
 
@@ -33,9 +33,9 @@ def populate_db():
     '''
     conn = connect_db()
     cursor=conn.cursor()
-    cursor.execute('INSERT INTO users ((user_name,role,groups) VALUES (?,?,?)',('Adam','admin','sic_mundus'))
-    cursor.execute('INSERT INTO users ((user_name,role,groups) VALUES (?,?,?)',('Mikkel Nielson','employee','level1'))
-    cursor.commit()
+    cursor.execute('INSERT INTO users (user_name,role,groups) VALUES (?,?,?)',('Adam','admin','sic_mundus'))
+    cursor.execute('INSERT INTO users (user_name,role,groups) VALUES (?,?,?)',('Mikkel Nielson','employee','level1'))
+    conn.commit()
     conn.close()
     print('A first record inserted...')
 

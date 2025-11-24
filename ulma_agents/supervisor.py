@@ -3,7 +3,7 @@ This agent is the user-facing agent. Takes requests (e.g., email/ticket), parses
 '''
 
 import datetime
-from google.adk.agents import Agent
+from google.adk.agents import Agent, LoopAgent
 from google.adk.tools import FunctionTool
 from .config import config
 from front import front_agent
@@ -17,7 +17,7 @@ from retry import retry_config
 
 
 
-agent=Agent(
+agent=LoopAgent(
     name = 'supervisor_agent',
     model=config.supervisor_agent,
     description='The supervisor agent. Takes the output from the front agent and utilize the other subagents and tools to fulfill the user request',
@@ -45,6 +45,7 @@ agent=Agent(
                 d. 'db_tool': provides the latest state of a 'user_name'. INPUT: 'user_name', OUTPUT: role, access privileges to apps/groups.
                 e. 'front_agent': interacts with the user. INPUT: a list of constraints or a request for missing information or a status update. OUTPUT: approval state (APPROVED/NOT APPROVED) or the requested information.
                 f. 'save_flow_log': saves the records of the tool call outputs throughout the plan execution.
+                d. 'get_all_step_stats': you can call this to check if every other tool (identity, teams, policy) did their job correctly. The tool will return boolean flags showing the success of each tool and the whole operation. 
             3. DO NOT execute the plan yet.
     4. **Determine the permissions:** Format your plan of tool calls to a concise list. Determine if human approval is required before continuing with the plan. Send the concise list to 'front_agent' tool. Await for the confirmation from 'front_agent' tool.
     5. **Execute plan:** If the confirmation (APPROVED) is received from the 'front_agent' tool, execute the plan.
@@ -58,6 +59,7 @@ agent=Agent(
         teams_agent,
         policy_agent
     ],
+    max_iterations=2,
     tools=[FunctionTool(db_tool),
            FunctionTool(save_flow_log),
            FunctionTool(get_all_step_status)],
