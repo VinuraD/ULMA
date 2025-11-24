@@ -3,7 +3,7 @@ This agent is the user-facing agent. Takes requests (e.g., email/ticket), parses
 '''
 
 
-from supervisor import supervisor_agent
+from .supervisor import supervisor_agent
 import datetime
 from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
@@ -37,11 +37,8 @@ agent=Agent(
         2. If the 'supervisor_agent' asked for missing information, check if it is already provided by the user. If not, request the information from the user.
         3. If the 'supervisor_agent' sent an update of the operation (SUCCESS/FAILURE) notify the user.
     8. **End**: If the user agrees with the update, end the user session with a goodbye message.
-    '''
-    sub_agents = [
-        supervisor_agent
-    ],
-    tools=[],
+    ''',
+    sub_agents = [supervisor_agent],
     output_key='parsed_user_request'
 )
 

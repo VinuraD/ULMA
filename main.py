@@ -3,6 +3,8 @@ import os
 import ulma_agents
 
 def main():
+    agent=ulma_agents.agent_sessions(ulma_agents.front_agent)
+    print("Welcome to the ULMA Agent CLI! Type 'exit' or 'quit' to leave.")
     while True:
         try:
             user_input = input("\nYou: ").strip()
@@ -19,7 +21,7 @@ def main():
 
         # call the ADK agent; .run() returns a message-like object
         try:
-            response = ulma_agents.run(user_input)
+            response = agent.execute(user_input)
         except Exception as e:
             print(f"Agent error: {e}")
             continue

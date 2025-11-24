@@ -11,7 +11,7 @@ from .sub_agents import (
     identity_agent,
     policy_agent,
     teams_agent)
-from .tools import save_flow_log, get_all_steps_status
+from .tools import save_flow_log, get_all_steps_status,db_tool
 from retry import retry_config
 
 
@@ -52,7 +52,7 @@ agent=LoopAgent(
     6. **Monitor tools:**Closely monitor the outputs from the tools as you execute the plan'. You can use 'get_all_step_status' tool for this. Create a record of the flow of tool outputs and save it using 'save_flow_log' tool. For the filename, use the format 'user_name__goal.txt'.
     7. **Update**: Determine the state of the execution at the end of the plan (SUCCESS/FAILURE). Send this status to 'front_agent' tool in json format.
     8. **End**: Your workflow ends after the previous step.
-    '''
+    ''',
     sub_agents = [
         front_agent,
         identity_agent,
@@ -62,7 +62,7 @@ agent=LoopAgent(
     max_iterations=2,
     tools=[FunctionTool(db_tool),
            FunctionTool(save_flow_log),
-           FunctionTool(get_all_step_status)],
+           FunctionTool(get_all_steps_status)],
     output_key='supervisor_updates'
 )
 
