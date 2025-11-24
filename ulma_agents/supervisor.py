@@ -11,7 +11,8 @@ from .sub_agents import (
     identity_agent,
     policy_agent,
     teams_agent)
-from .tools import save_flow_log
+from .tools import save_flow_log, get_all_steps_status
+from retry import retry_config
 
 
 
@@ -58,7 +59,8 @@ agent=Agent(
         policy_agent
     ],
     tools=[FunctionTool(db_tool),
-           FunctionTool(save_flow_log)],
+           FunctionTool(save_flow_log),
+           FunctionTool(get_all_step_status)],
     output_key='supervisor_updates'
 )
 
