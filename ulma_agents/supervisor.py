@@ -45,11 +45,11 @@ agent=LoopAgent(
                 d. 'db_tool': provides the latest state of a 'user_name'. INPUT: 'user_name', OUTPUT: role, access privileges to apps/groups.
                 e. 'front_agent': interacts with the user. INPUT: a list of constraints or a request for missing information or a status update. OUTPUT: approval state (APPROVED/NOT APPROVED) or the requested information.
                 f. 'save_flow_log': saves the records of the tool call outputs throughout the plan execution.
-                d. 'get_all_step_stats': you can call this to check if every other tool (identity, teams, policy) did their job correctly. The tool will return boolean flags showing the success of each tool and the whole operation. 
+                d. 'get_all_step_status': you can call this to check if every other tool (identity, teams, policy) did their job correctly. The tool will return boolean flags showing the success of each tool and the whole operation. 
             3. DO NOT execute the plan yet.
     4. **Determine the permissions:** Format your plan of tool calls to a concise list. Determine if human approval is required before continuing with the plan. Send the concise list to 'front_agent' tool. Await for the confirmation from 'front_agent' tool.
     5. **Execute plan:** If the confirmation (APPROVED) is received from the 'front_agent' tool, execute the plan.
-    6. **Monitor tools:**Closely monitor the outputs from the tools as you execute the plan'. Create a record of the flow of tool outputs and save it using 'save_flow_log' tool. For the filename, use the format 'user_name__goal.txt'.
+    6. **Monitor tools:**Closely monitor the outputs from the tools as you execute the plan'. You can use 'get_all_step_status' tool for this. Create a record of the flow of tool outputs and save it using 'save_flow_log' tool. For the filename, use the format 'user_name__goal.txt'.
     7. **Update**: Determine the state of the execution at the end of the plan (SUCCESS/FAILURE). Send this status to 'front_agent' tool in json format.
     8. **End**: Your workflow ends after the previous step.
     '''

@@ -11,7 +11,12 @@ from dotenv import load_dotenv
 
 
 def save_flow_log(flow_updates:str,filename:str) -> Dict:
-    '''writes and saves exection updates to a log file'''
+    '''writes and saves exection updates to a log file
+    
+    Args:
+        flow_updates:each update in the flow.
+        filename:the filename (with extension) to be written.
+    '''
     path='./logs'
     if not (filename in os.listdir(path)):
         with open(filename,'w+') as f:
@@ -23,7 +28,11 @@ def save_flow_log(flow_updates:str,filename:str) -> Dict:
     return {'log_status':'saved'}
 
 def read_doc(filename:str) -> Dict:
-    '''reads the given filename and returns its content as a string object'''
+    '''reads the given filename and returns its content as a string object
+    
+    Args: 
+        filename: the filename (without extension) to be read from.
+    '''
     path='./policy'
     if filename in os.listdir(path):
         reader = PdfReader(path+filename+'.pdf')
