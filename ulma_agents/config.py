@@ -11,6 +11,7 @@ This holds configurations for all agents including subagents
 import os
 from dataclasses import dataclass
 import google.auth
+from google.genai import types
 
 
 _, project_id = google.auth.default()
@@ -41,20 +42,9 @@ config = ResearchConfiguration()
 
 ###Configurations for MCP servers###
 
-mcp_config={
-    "mcpServers": {
-    "sqlite": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-sqlite",
-        "/absolute/path/to/your/database.sqlite"
-      ]
-    }
-  }
-
-
-
-
-
-}
+retry_config = types.HttpRetryOptions(
+    attempts=5,  # Maximum retry attempts
+    exp_base=7,  # Delay multiplier
+    initial_delay=1,
+    http_status_codes=[429, 500, 503, 504],  # Retry on these HTTP errors
+)
