@@ -1,6 +1,6 @@
-google-adk==1.18.0
-pytest==8.4.2
-pytest-asyncio==1.2.0
+google-adk
+pytest
+pytest-asyncio
 deprecated
 pandas
 tabulate
@@ -8,4 +8,7 @@ tqdm
 scikit-learn
 pypdf
 python-dotenv
-fastapi uvicorn
+fastapi
+uvicorn
+pydantic
+opentelemetry-instrumentation-google-genai

@@ -8,14 +8,22 @@ import datetime
 from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
 from .config import config
+import vertexai
+import os
+import dotenv
 
+dotenv.load_dotenv()
 
+vertexai.init(
+    project=os.environ["GOOGLE_CLOUD_PROJECT"],
+    location=os.environ["GOOGLE_CLOUD_LOCATION"],
+)
 
 agent=Agent(
     name = 'user_facing_agent',
     model=config.front_agent,
     description='The user facing agent. Takes requests from the user and parses. Updates the user at the end of the operations.',
-    instruction=f'''
+    instruction='''
     You are the front face of a user lice cycle management system. Your primary function is to take user requests in, parse them and
     to be forwarded to the next tool.
 

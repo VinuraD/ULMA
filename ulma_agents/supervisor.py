@@ -6,18 +6,10 @@ import datetime
 from google.adk.agents import Agent, LoopAgent
 from google.adk.tools import FunctionTool
 from .config import config
-from front import front_agent
-from .sub_agents import (
-    identity_agent,
-    policy_agent,
-    teams_agent)
+from .sub_agents.policy_agent import policy_agent
 from .tools import save_flow_log, get_all_steps_status,db_tool
-from retry import retry_config
 
-
-
-
-agent=LoopAgent(
+agent=Agent(
     name = 'supervisor_agent',
     model=config.supervisor_agent,
     description='The supervisor agent. Takes the output from the front agent and utilize the other subagents and tools to fulfill the user request',
@@ -54,16 +46,15 @@ agent=LoopAgent(
     8. **End**: Your workflow ends after the previous step.
     ''',
     sub_agents = [
-        front_agent,
-        identity_agent,
-        teams_agent,
-        policy_agent
+        # identity_agent,
+        # teams_agent,
+        policy_agent,
     ],
-    max_iterations=2,
+    # max_iterations=2,
     tools=[FunctionTool(db_tool),
            FunctionTool(save_flow_log),
            FunctionTool(get_all_steps_status)],
     output_key='supervisor_updates'
 )
 
-front_agent = agent
+supervisor_agent = agent

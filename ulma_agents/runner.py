@@ -2,7 +2,7 @@ import asyncio
 from unittest import runner
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
-from front import front_agent
+from .front import front_agent
 from google.genai import types as genai_types
 import uuid
 

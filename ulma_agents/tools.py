@@ -92,7 +92,7 @@ def get_all_steps_status(tool_context: ToolContext) -> Dict[str, Any]:
 
 ###MCP tools###
     
-def mcp_db_tool():
+def db_tool():
     load_dotenv()
     DATABASE = os.getenv("DATABASE_NAME")
     conf=[McpToolset(

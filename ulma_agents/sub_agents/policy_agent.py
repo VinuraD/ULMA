@@ -5,16 +5,14 @@ This agent is the user-facing agent. Takes requests (e.g., email/ticket), parses
 import datetime
 from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
-from .config import config
-from front import front_agent
-from .tools import read_doc, save_step_status
+from ..config import config
+# from ..front import front_agent
+from ..tools import read_doc, save_step_status
+import vertexai
 
-
-
-
-agent=Agent(
+policy_agent=Agent(
     name = 'policy_agent',
-    model=config.supervisor_agent,
+    model=config.policy_agent,
     description='The policy agent. Takes the goal, poilcy document name, reads and outputs its content as constraints',
     instruction=f'''
     You read policy documents, understands its content in relation to the required goal and provides a set of policy constraints related to the goal.
@@ -25,9 +23,7 @@ agent=Agent(
     3. **Format the constraints:**Format the extracted constraints in the previous step as a concise list of constraints. Make sure there are no conflicting or ambiguous constraints. 
     4. **Set status:** If you successfully extracted the relevant policies, call "save_step_status" tool with step="policy" and done=True. If it failed, call it with done=False.
     5. **End**: Your workflow ends after the previous step.
-    '''
+    ''',
     tools=[FunctionTool(read_doc),FunctionTool(save_step_status)],
     output_key='policy_constraints'
 )
-
-policy_agent = agent
