@@ -7,6 +7,8 @@ from google.adk.agents import Agent, LoopAgent
 from google.adk.tools import FunctionTool
 from .config import config
 from .sub_agents.policy_agent import policy_agent
+from .sub_agents.identity_agent import identity_agent
+from .sub_agents.teams_agent import teams_agent
 from .tools import save_flow_log, get_all_steps_status,db_tool
 
 agent=Agent(
@@ -45,11 +47,7 @@ agent=Agent(
     7. **Update**: Determine the state of the execution at the end of the plan (SUCCESS/FAILURE). Send this status to 'front_agent' tool in json format.
     8. **End**: Your workflow ends after the previous step.
     ''',
-    sub_agents = [
-        # identity_agent,
-        # teams_agent,
-        policy_agent,
-    ],
+    sub_agents = [identity_agent, teams_agent, policy_agent],
     # max_iterations=2,
     tools=[FunctionTool(db_tool),
            FunctionTool(save_flow_log),

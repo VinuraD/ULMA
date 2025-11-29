@@ -1,6 +1,7 @@
 import os
 import glob
 import datetime
+import sqlite3
 from typing import List, Dict, Any
 from pypdf import PdfReader
 from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
@@ -8,6 +9,7 @@ from google.adk.tools.tool_context import ToolContext
 from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
 from mcp import StdioServerParameters
 from dotenv import load_dotenv
+from .create_db import get_db_path
 
 
 def save_flow_log(flow_updates:str,filename:str) -> Dict:
@@ -17,29 +19,36 @@ def save_flow_log(flow_updates:str,filename:str) -> Dict:
         flow_updates:each update in the flow.
         filename:the filename (with extension) to be written.
     '''
-    path='./logs'
-    if not (filename in os.listdir(path)):
-        with open(filename,'w+') as f:
-            f.write('Log of the tool calls....Date:{}'.format(datetime.datetime.now()))
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+    path=os.path.join(root_dir,'logs')
+    os.makedirs(path, exist_ok=True)
+    full_path=os.path.join(path,filename)
+    if not os.path.exists(full_path):
+        with open(full_path,'w+') as f:
+            f.write('Log of the tool calls....Date:{}\n'.format(datetime.datetime.now()))
 
-    with open(filename,'a') as f:
+    with open(full_path,'a') as f:
         f.write(flow_updates)
 
-    return {'log_status':'saved'}
+    return {'log_status':'saved','file':full_path}
 
 def read_doc(filename:str) -> Dict:
     '''reads the given filename and returns its content as a string object
     
     Args: 
-        filename: the filename (without extension) to be read from.
+        filename: the filename (with or without .pdf extension) to be read from.
     '''
-    path='./policy'
-    if filename in os.listdir(path):
-        reader = PdfReader(path+filename+'.pdf')
-        page = reader.pages
-        return {'text':page}
-    else:
+    base_dir=os.path.dirname(__file__)
+    policy_dir=os.path.join(base_dir,'policy')
+    base_name=os.path.splitext(filename)[0]
+    pdf_path=os.path.join(policy_dir,base_name+'.pdf')
+    if not os.path.exists(pdf_path):
         return {'text':''}
+    reader = PdfReader(pdf_path)
+    text_parts=[]
+    for page in reader.pages:
+        text_parts.append(page.extract_text() or "")
+    return {'text':"\n".join(text_parts)}
     
 ###Session Context Tools###
 
@@ -94,7 +103,9 @@ def get_all_steps_status(tool_context: ToolContext) -> Dict[str, Any]:
     
 def db_tool():
     load_dotenv()
-    DATABASE = os.getenv("DATABASE_NAME")
+    db_path=get_db_path()
+    if not os.path.exists(db_path):
+        sqlite3.connect(db_path).close()
     conf=[McpToolset(
             connection_params=StdioConnectionParams(
                 server_params=StdioServerParameters(
@@ -102,7 +113,7 @@ def db_tool():
                     args=[
                         "-y",
                         "@modelcontextprotocol/server-sqlite",
-                        "local_addb",
+                        db_path,
                     ],
                 )
             ),

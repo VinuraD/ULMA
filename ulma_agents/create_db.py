@@ -1,10 +1,20 @@
+import os
 import sqlite3
 from dotenv import load_dotenv
-import os
 
 
-def connect_db():
-    conn = sqlite3.connect(DATABASE+'db')
+def get_db_path():
+    load_dotenv()
+    db_name = os.getenv("DATABASE_NAME", "local_addb")
+    if not os.path.isabs(db_name):
+        base_dir = os.path.dirname(__file__)
+        db_name = os.path.join(base_dir, db_name)
+    return db_name
+
+
+def connect_db(db_path=None):
+    path = db_path or get_db_path()
+    conn = sqlite3.connect(path)
     return conn
 
 
@@ -41,9 +51,6 @@ def populate_db():
 
 
 if __name__=='__main__':
-    load_dotenv()
-    DATABASE = os.getenv("DATABASE_NAME")
-    connect_db()
     create_db()
     populate_db()
 

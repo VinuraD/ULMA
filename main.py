@@ -2,7 +2,7 @@ import asyncio
 import os
 import ulma_agents
 
-def main():
+async def main():
     agent=ulma_agents.agent_sessions(ulma_agents.front_agent)
     print("Welcome to the ULMA Agent CLI! Type 'exit' or 'quit' to leave.")
     while True:
@@ -21,7 +21,7 @@ def main():
 
         # call the ADK agent; .run() returns a message-like object
         try:
-            response = agent.execute(user_input)
+            response = await agent.execute(user_input)
         except Exception as e:
             print(f"Agent error: {e}")
             continue
@@ -32,4 +32,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

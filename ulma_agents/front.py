@@ -14,10 +14,27 @@ import dotenv
 
 dotenv.load_dotenv()
 
-vertexai.init(
-    project=os.environ["GOOGLE_CLOUD_PROJECT"],
-    location=os.environ["GOOGLE_CLOUD_LOCATION"],
-)
+def _init_client():
+    """Initialize Vertex or fall back to API-key path if env vars are missing."""
+    project = os.getenv("GOOGLE_CLOUD_PROJECT")
+    location = os.getenv("GOOGLE_CLOUD_LOCATION")
+    api_key = os.getenv("GOOGLE_API_KEY")
+    use_vertex = os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "").lower()
+
+    if use_vertex != "false" and project and location:
+        vertexai.init(project=project, location=location)
+        return
+
+    if api_key:
+        os.environ.setdefault("GOOGLE_GENAI_USE_VERTEXAI", "FALSE")
+        return
+
+    raise RuntimeError(
+        "Missing configuration: set GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION "
+        "for Vertex, or provide GOOGLE_API_KEY for the API-key path."
+    )
+
+_init_client()
 
 agent=Agent(
     name = 'user_facing_agent',
