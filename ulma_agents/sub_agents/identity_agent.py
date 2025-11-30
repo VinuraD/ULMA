@@ -20,21 +20,6 @@ identity_agent = Agent(
     model=config.identity_agent,
     description="Identity agent for Entra ID operations via Azure MCP.",
     instruction="""
-<<<<<<< HEAD
-    You are the identity agent stub. For now, acknowledge the request and
-    describe the changes you would apply to the directory (user state, roles,
-    groups, apps).
-
-    Always summarize what was done (or attempted) for the manager by calling
-    'send_manager_message' with a brief, executive-friendly update. This writes
-    a text file under logs/teams/incoming/summaries.
-
-    When you finish, call save_step_status with step="identity" and done=True to
-    mark success. If something looks wrong, call it with done=False and explain
-    why in your response, and still send a manager summary noting the issue.
-    """,
-    tools=[FunctionTool(save_step_status), FunctionTool(send_manager_message)],
-=======
     You are the identity agent. Use the Azure MCP tools to read or change Entra ID.
 
     Available MCP tools (prefixed with `azure_`):
@@ -51,6 +36,5 @@ identity_agent = Agent(
       4) Call save_step_status(step="identity", done=True) on success; use done=False if any operation failed or was skipped.
     """,
     tools=[azure_mcp_toolset, FunctionTool(save_step_status)],
->>>>>>> a68f4d4 (azure updates)
     output_key="identity_updates",
 )
