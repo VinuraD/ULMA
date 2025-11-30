@@ -1,0 +1,14 @@
+Log of the tool calls....Date:2025-11-30 16:22:32.884883
+{
+  "action": "onboard",
+  "user": "Adam Smith",
+  "role": "admin",
+  "groups": [
+    "a86406a3-f8eb-47b5-8dbd-2e7a656e105b",
+    "92317e17-6438-4f12-995d-76635e178383",
+    "4a9777e6-36cb-4aa5-a41e-b49edfaa4b48"
+  ],
+  "applications": [
+    "4eea052e-7c7d-4e59-b9a9-2c0220a686e1"
+  ]
+}
