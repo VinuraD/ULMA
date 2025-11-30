@@ -2,6 +2,7 @@ import os
 import glob
 import datetime
 import sqlite3
+import json
 from typing import List, Dict, Any
 from pypdf import PdfReader
 from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
@@ -9,7 +10,12 @@ from google.adk.tools.tool_context import ToolContext
 from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
 from mcp import StdioServerParameters
 from dotenv import load_dotenv
-from .create_db import get_db_path
+from .create_db import (
+    get_db_path,
+    save_memory_state,
+    load_memory_state,
+    ensure_memory_table,
+)
 
 
 def save_flow_log(flow_updates:str,filename:str) -> Dict:
@@ -52,6 +58,33 @@ def read_doc(filename:str) -> Dict:
     
 ###Session Context Tools###
 
+def _json_safe_state(state: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Converts state into a JSON-safe dict (fallback to str on unsupported types).
+    """
+    try:
+        return json.loads(json.dumps(state, default=str))
+    except Exception:
+        return {}
+
+
+def load_session_memory(session_id: str) -> Dict[str, Any]:
+    """
+    Loads persisted session memory (if any).
+    """
+    ensure_memory_table()
+    return load_memory_state(session_id)
+
+
+def save_session_memory(session_id: str, state: Dict[str, Any]) -> None:
+    """
+    Persists the given session state to durable storage.
+    """
+    ensure_memory_table()
+    safe_state = _json_safe_state(state)
+    save_memory_state(session_id, safe_state)
+
+
 def save_step_status(
     tool_context: ToolContext, step: str, done: bool
 ) -> Dict[str, Any]:
@@ -73,7 +106,13 @@ def save_step_status(
         state["STATE_REPORTING_OK"] = done
     elif step == "remote_delegation":
         state["STATE_REMOTE_OK"] = done
-
+    # Persist updated state for durability across sessions
+    session_id = getattr(tool_context, "session_id", None)
+    if session_id:
+        try:
+            save_session_memory(session_id, state)
+        except Exception as exc:
+            print(f"[memory] failed to persist session state: {exc}")
     return {"step": step, "done": done}
 
 
