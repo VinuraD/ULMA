@@ -1,5 +1,8 @@
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
+from google.adk.plugins.logging_plugin import (
+    LoggingPlugin,
+)
 import uuid
 import inspect
 import os
@@ -12,7 +15,7 @@ class agent_sessions:
         self.session_id=os.getenv("ULMA_SESSION_ID", f"ulma_{uuid.uuid4().hex[:8]}")
         self.session_service = InMemorySessionService()
         self.runner = Runner(
-            agent=self.agent, app_name="app", session_service=self.session_service
+            agent=self.agent, app_name="app", session_service=self.session_service, plugins=[LoggingPlugin()]
         )
         self._session_ready = False
         return
