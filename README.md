@@ -30,7 +30,7 @@ It leverages the **Google Agent Development Kit (ADK)** and **Google Gemini Mode
 ### Setup
 1.  **Clone the repository:**
     ```bash
-    git clone <repository_url>
+    git clone https://github.com/VinuraD/ULMA.git
     cd ULMA
     ```
 
