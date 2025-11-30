@@ -79,13 +79,35 @@ def save_step_status(
 
 def send_manager_message(message: str) -> Dict[str, Any]:
     """
-    Sends a direct message summary to the manager via Teams.
+    Simulates sending a manager summary by writing a timestamped text file; also prints to console.
     
     Args:
         message: The summary text to send.
     """
-    print(f"\n[Teams Manager DM] >>> {message}\n")
-    return {"status": "sent", "recipient": "Manager", "content": message}
+    now = datetime.datetime.now()
+    stamp = now.strftime("%Y%m%d_%H%M%S")
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+    out_dir = os.path.join(root_dir, "logs", "manager_summaries")
+    os.makedirs(out_dir, exist_ok=True)
+
+    filename = f"manager_summary_{stamp}.txt"
+    filepath = os.path.join(out_dir, filename)
+
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(f"Timestamp: {now.isoformat()}\n")
+        f.write("Recipient: Manager\n")
+        f.write("Content:\n")
+        f.write(message.strip() + "\n")
+
+    print(f"\n[Teams Manager DM] (simulated) >>> {message}\n")
+    print(f"[Teams Manager DM] Saved summary to {filepath}\n")
+
+    return {
+        "status": "sent",
+        "recipient": "Manager",
+        "content": message,
+        "file": filepath,
+    }
 
 
 

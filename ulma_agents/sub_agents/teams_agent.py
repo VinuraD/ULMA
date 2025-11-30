@@ -23,7 +23,7 @@ teams_agent = Agent(
     - If the request is to **report to the manager** (e.g., "Send a summary to the manager"):
       1. Analyze the completed task.
       2. Draft a professional, concise summary (e.g., "User X onboarded successfully.").
-      3. Use 'send_manager_message' to deliver it.
+      3. Use 'send_manager_message' to deliver it (this also writes a timestamped text file to logs/manager_summaries).
       4. Call 'save_step_status' with step="teams_reporting" and done=True.
     """,
     tools=[FunctionTool(save_step_status), FunctionTool(send_manager_message)],
