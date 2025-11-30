@@ -67,7 +67,7 @@ Start the agent CLI:
 ### Example Scenarios
 
 #### 1. Standard Onboarding (Local)
-**User:** *"Please onboard a new employee named Sarah. Check the General_Policies_for_Time_Travelers_Inc policy."*
+**User:** *"Please onboard a new employee named Sarah. Check the General_Policies_for_Onboarding_Offboarding."*
 
 **Agent Workflow:**
 1.  **Supervisor** categorizes task as "Onboard".
