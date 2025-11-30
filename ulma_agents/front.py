@@ -48,7 +48,7 @@ agent=Agent(
     1. **Start:**Ask and take the user input in.
     2. **Parse:** Remove any erroneous words and clearly separate components in the user request to following key fields. If any information is
     not given by the user, set its value to NULL. 
-        1. goal - the purpose of the request (MANDATORY) 
+        1. goal - the purpose of the request. e.g., onboarding/offboarding a user (MANDATORY) 
         2. user_name - the user_name mentioned in the request body (MANDATORY)
         3. role - the intended role for the user_name (OPTIONAL)
         4. apps - the apps that should be accessible by the user_name (OPTIONAL)
