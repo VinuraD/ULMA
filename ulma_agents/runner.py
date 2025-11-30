@@ -18,7 +18,7 @@ class agent_sessions:
         if self._session_ready:
             return
         await self.session_service.create_session(
-            app_name="app", user_id="admin_user", session_id=self.session_id
+            app_name="app", user_id="user", session_id=self.session_id
         )
         self._session_ready = True
 
@@ -29,7 +29,7 @@ class agent_sessions:
         """Executes the agent with the given input text"""
         await self._ensure_session()
         response = self.runner.run_async(
-            session_id=self.session_id, new_message=input_text, user_id="admin_user"
+            session_id=self.session_id, new_message=input_text, user_id="user"
         )
         self.events.append(response)
         return response
