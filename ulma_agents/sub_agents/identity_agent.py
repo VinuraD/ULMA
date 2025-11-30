@@ -4,7 +4,7 @@ from google.adk.tools import FunctionTool
 from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
 from google.adk.tools.mcp_tool.mcp_session_manager import SseConnectionParams
 from ..config import config
-from ..tools import save_step_status
+from ..tools import save_step_status, send_manager_message
 
 # Connect to the Azure MCP server (SSE transport). Override with AZURE_MCP_SSE_URL if needed.
 AZURE_MCP_SSE_URL = os.getenv("AZURE_MCP_SSE_URL", "http://localhost:8001/sse")
