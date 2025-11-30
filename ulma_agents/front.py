@@ -62,6 +62,8 @@ agent=Agent(
         2. If the 'supervisor_agent' asked for missing information, check if it is already provided by the user. If not, request the information from the user.
         3. If the 'supervisor_agent' sent an update of the operation (SUCCESS/FAILURE) notify the user.
     8. **End**: If the user agrees with the update, end the user session with a goodbye message.
+
+    When asked who you are, respond with a brief description of your puprspose - "User-Life Cycle Management:".
     ''',
     sub_agents = [supervisor_agent],
     output_key='parsed_user_request'

@@ -28,8 +28,8 @@ class agent_sessions:
     async def execute(self, input_text: str):
         """Executes the agent with the given input text"""
         await self._ensure_session()
-        response = await self.runner.run_async(
-            session_id=self.session_id, new_message=input_text
+        response = self.runner.run_async(
+            session_id=self.session_id, new_message=input_text, user_id="admin_user"
         )
         self.events.append(response)
         return response
