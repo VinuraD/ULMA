@@ -3,7 +3,7 @@ import glob
 import datetime
 import sqlite3
 import json
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from pypdf import PdfReader
 from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
 from google.adk.tools.tool_context import ToolContext
@@ -17,6 +17,23 @@ from .create_db import (
     ensure_memory_table,
 )
 
+### Paths/helpers for simulated Teams messaging ###
+def _ensure_teams_dirs() -> Dict[str, str]:
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+    base = os.path.join(root_dir, "logs", "teams")
+    incoming = os.path.join(base, "incoming")
+    outgoing = os.path.join(base, "outgoing")
+    incoming_approvals = os.path.join(incoming, "approvals")
+    incoming_summaries = os.path.join(incoming, "summaries")
+    for path in (base, incoming, outgoing, incoming_approvals, incoming_summaries):
+        os.makedirs(path, exist_ok=True)
+    return {
+        "base": base,
+        "incoming": incoming,
+        "incoming_approvals": incoming_approvals,
+        "incoming_summaries": incoming_summaries,
+        "outgoing": outgoing,
+    }
 
 def save_flow_log(flow_updates:str,filename:str) -> Dict:
     '''writes and saves exection updates to a log file
@@ -85,6 +102,149 @@ def save_session_memory(session_id: str, state: Dict[str, Any]) -> None:
     save_memory_state(session_id, safe_state)
 
 
+def _write_approval_log(session_id: str, approved: bool, plan_summary: str, note: str = "") -> str:
+    """
+    Writes an approval event to a log file.
+    """
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+    out_dir = os.path.join(root_dir, "logs", "approvals")
+    os.makedirs(out_dir, exist_ok=True)
+    stamp = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    filename = f"{session_id}_approvals.txt"
+    filepath = os.path.join(out_dir, filename)
+    with open(filepath, "a", encoding="utf-8") as f:
+        f.write(f"{stamp} | APPROVED={approved} | PLAN={plan_summary}\n")
+        if note:
+            f.write(f"note: {note}\n")
+    return filepath
+
+
+def set_approval_status(
+    tool_context: ToolContext, approved: bool, plan_summary: str = "", note: str = ""
+) -> Dict[str, Any]:
+    """
+    Records a human approval decision and persists it.
+    """
+    state = tool_context.state
+    state["APPROVAL_STATUS"] = "APPROVED" if approved else "REJECTED"
+    state["APPROVAL_TS"] = datetime.datetime.utcnow().isoformat()
+    if plan_summary:
+        state["APPROVAL_PLAN"] = plan_summary[:2000]
+    if note:
+        state["APPROVAL_NOTE"] = note[:1000]
+
+    session_id = getattr(tool_context, "session_id", None)
+    logfile = None
+    if session_id:
+        try:
+            save_session_memory(session_id, state)
+            logfile = _write_approval_log(
+                session_id=session_id, approved=approved, plan_summary=plan_summary, note=note
+            )
+        except Exception as exc:
+            print(f"[approval] failed to persist approval: {exc}")
+    return {
+        "approved": approved,
+        "plan_summary": plan_summary,
+        "note": note,
+        "logfile": logfile,
+    }
+
+
+def get_approval_status(tool_context: ToolContext) -> Dict[str, Any]:
+    """
+    Returns the current approval status from session state.
+    """
+    state = tool_context.state
+    status = state.get("APPROVAL_STATUS")
+    return {
+        "status": status,
+        "approved": status == "APPROVED",
+        "rejected": status == "REJECTED",
+        "plan_summary": state.get("APPROVAL_PLAN"),
+        "note": state.get("APPROVAL_NOTE"),
+        "ts": state.get("APPROVAL_TS"),
+    }
+
+
+def send_teams_message(kind: str, message: str, filename: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Simulates sending a Teams message by writing to an incoming folder.
+
+    Args:
+        kind: "approvals" or "summaries".
+        message: Text to write.
+        filename: Optional base filename (without path). Defaults to timestamped name.
+    """
+    paths = _ensure_teams_dirs()
+    now = datetime.datetime.utcnow()
+    stamp = now.strftime("%Y%m%d_%H%M%S")
+    if filename:
+        base_name = os.path.splitext(filename)[0] + ".txt"
+    else:
+        base_name = f"{kind}_{stamp}.txt"
+
+    if kind == "approvals":
+        incoming_dir = paths["incoming_approvals"]
+    else:
+        incoming_dir = paths["incoming_summaries"]
+
+    incoming_path = os.path.join(incoming_dir, base_name)
+    outgoing_path = os.path.join(paths["outgoing"], base_name)
+
+    with open(incoming_path, "w", encoding="utf-8") as f:
+        f.write(f"Timestamp: {now.isoformat()}Z\n")
+        f.write(f"Type: {kind}\n")
+        f.write("Content:\n")
+        f.write(message.strip() + "\n")
+        f.write("\n--- Reply in outgoing folder with the same filename. End message with 'over'. ---\n")
+
+    print(f"[Teams simulated] wrote incoming {kind} message to {incoming_path}")
+    return {
+        "incoming_file": incoming_path,
+        "outgoing_file": outgoing_path,
+        "filename": base_name,
+        "kind": kind,
+    }
+
+
+def read_teams_reply(filename: str) -> Dict[str, Any]:
+    """
+    Checks for a reply file in the outgoing folder and reports completion if 'over' is present.
+
+    Args:
+        filename: The base filename to look for (e.g., from send_teams_message).
+    """
+    paths = _ensure_teams_dirs()
+    base_name = os.path.splitext(filename)[0] + ".txt"
+    outgoing_path = os.path.join(paths["outgoing"], base_name)
+
+    if not os.path.exists(outgoing_path):
+        return {
+            "status": "pending",
+            "filename": base_name,
+            "outgoing_file": outgoing_path,
+            "message": "",
+            "done": False,
+            "reason": "no reply yet",
+        }
+
+    with open(outgoing_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    lines = [ln.strip() for ln in content.splitlines() if ln.strip()]
+    last_line = lines[-1].lower() if lines else ""
+    done = last_line == "over" or any(ln.lower() == "over" for ln in lines)
+
+    return {
+        "status": "complete" if done else "in_progress",
+        "filename": base_name,
+        "outgoing_file": outgoing_path,
+        "message": content,
+        "done": done,
+    }
+
+
 def save_step_status(
     tool_context: ToolContext, step: str, done: bool
 ) -> Dict[str, Any]:
@@ -106,6 +266,8 @@ def save_step_status(
         state["STATE_REPORTING_OK"] = done
     elif step == "remote_delegation":
         state["STATE_REMOTE_OK"] = done
+    elif step == "approval_request":
+        state["WAITING_FOR_APPROVAL"] = True
     # Persist updated state for durability across sessions
     session_id = getattr(tool_context, "session_id", None)
     if session_id:
@@ -118,36 +280,44 @@ def save_step_status(
 
 def send_manager_message(message: str) -> Dict[str, Any]:
     """
-    Simulates sending a manager summary by writing a timestamped text file; also prints to console.
+    Simulates sending a manager summary by writing a text file to the Teams incoming/summaries folder; also prints to console.
     
     Args:
         message: The summary text to send.
     """
-    now = datetime.datetime.now()
-    stamp = now.strftime("%Y%m%d_%H%M%S")
-    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-    out_dir = os.path.join(root_dir, "logs", "manager_summaries")
-    os.makedirs(out_dir, exist_ok=True)
-
-    filename = f"manager_summary_{stamp}.txt"
-    filepath = os.path.join(out_dir, filename)
-
-    with open(filepath, "w", encoding="utf-8") as f:
-        f.write(f"Timestamp: {now.isoformat()}\n")
-        f.write("Recipient: Manager\n")
-        f.write("Content:\n")
-        f.write(message.strip() + "\n")
-
+    result = send_teams_message(kind="summaries", message=message, filename=None)
     print(f"\n[Teams Manager DM] (simulated) >>> {message}\n")
-    print(f"[Teams Manager DM] Saved summary to {filepath}\n")
+    print(f"[Teams Manager DM] Saved summary to {result['incoming_file']}\n")
 
     return {
         "status": "sent",
         "recipient": "Manager",
         "content": message,
-        "file": filepath,
+        "file": result["incoming_file"],
+        "reply_file": result["outgoing_file"],
     }
 
+def request_approval(tool_context: ToolContext, description: str) -> Dict[str, Any]:
+    """
+    Sends an approval request via simulated Teams folders and sets the session to wait.
+    
+    Args:
+        description: Description of the high-risk action requiring approval.
+    """
+    result = send_teams_message(kind="approvals", message=description)
+    print(f"\n[Teams Approval] >>> wrote request to {result['incoming_file']}")
+    print(f"[Teams Approval] Awaiting reply in {result['outgoing_file']} (end with 'over')\n")
+
+    tool_context.state["WAITING_FOR_APPROVAL"] = True
+
+    return {
+        "status": "sent",
+        "type": "approval_card",
+        "content": description,
+        "incoming_file": result["incoming_file"],
+        "outgoing_file": result["outgoing_file"],
+        "action_required": "Manager Approval",
+    }
 
 
 # This demonstrates how tools can read from session state.

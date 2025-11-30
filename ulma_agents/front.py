@@ -8,6 +8,7 @@ import datetime
 from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
 from .config import config
+from .tools import set_approval_status, get_approval_status
 import vertexai
 import os
 import dotenv
@@ -59,6 +60,8 @@ agent=Agent(
     6. **Await:** Await for an update from the 'supervisor_agent'. Notify the user that you are waiting for an update.
     7. **Update**: Update the user with the information received from the 'supervisor_agent'. Be clear and concise.
         1. If the 'supervisor_agent' sent a plan to be approved, request the user approval.
+           - If user APPROVES, call "set_approval_status" with approved=True and plan_summary set to the plan you presented.
+           - If user REJECTS or asks for changes, call "set_approval_status" with approved=False and include a short note about the reason.
         2. If the 'supervisor_agent' asked for missing information, check if it is already provided by the user. If not, request the information from the user.
         3. If the 'supervisor_agent' sent an update of the operation (SUCCESS/FAILURE) notify the user.
     8. **End**: If the user agrees with the update, end the user session with a goodbye message.
@@ -66,6 +69,7 @@ agent=Agent(
     When asked who you are, respond with a brief description of your puprspose - "User-Life Cycle Management:".
     ''',
     sub_agents = [supervisor_agent],
+    tools=[FunctionTool(set_approval_status), FunctionTool(get_approval_status)],
     output_key='parsed_user_request'
 )
 
