@@ -69,8 +69,24 @@ def save_step_status(
         state["STATE_IDENTITY_OK"] = done
     elif step == "teams":
         state["STATE_TEAMS_OK"] = done
+    elif step == "teams_reporting":
+        state["STATE_REPORTING_OK"] = done
+    elif step == "remote_delegation":
+        state["STATE_REMOTE_OK"] = done
 
     return {"step": step, "done": done}
+
+
+def send_manager_message(message: str) -> Dict[str, Any]:
+    """
+    Sends a direct message summary to the manager via Teams.
+    
+    Args:
+        message: The summary text to send.
+    """
+    print(f"\n[Teams Manager DM] >>> {message}\n")
+    return {"status": "sent", "recipient": "Manager", "content": message}
+
 
 
 # This demonstrates how tools can read from session state.

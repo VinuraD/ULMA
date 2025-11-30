@@ -35,6 +35,7 @@ class ResearchConfiguration:
     policy_agent: str = "gemini-2.5-flash-lite"
     identity_agent: str = "gemini-2.5-flash"
     teams_agent: str = "gemini-2.5-flash-lite" #should revise
+    remote_agent: str = "gemini-2.5-flash-lite"
     max_search_iterations: int = 5
 
 
