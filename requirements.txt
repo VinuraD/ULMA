@@ -7,8 +7,11 @@ tabulate
 tqdm
 scikit-learn
 pypdf
+mcp[cli]
+requests
+starlette
+uvicorn[standard]
 python-dotenv
 fastapi
-uvicorn
 pydantic
 opentelemetry-instrumentation-google-genai
