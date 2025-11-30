@@ -27,6 +27,10 @@ TENANT_ID = os.getenv("AZURE_TENANT_ID")
 CLIENT_ID = os.getenv("AZURE_CLIENT_ID")
 CLIENT_SECRET = os.getenv("AZURE_CLIENT_SECRET")
 GRAPH_SCOPE = os.getenv("AZURE_GRAPH_SCOPE", "https://graph.microsoft.com/.default")
+# Default M365 Business Standard SKU; override with env var if your tenant differs.
+BUSINESS_STANDARD_SKU = os.getenv(
+    "M365_BUSINESS_STANDARD_SKU_ID", "c42b9cae-ea4f-4ab7-9717-81576235ccac"
+)
 
 if not (TENANT_ID and CLIENT_ID and CLIENT_SECRET):
     logger.warning(
@@ -122,7 +126,18 @@ def _graph_post(url: str, body: Dict[str, Any]) -> Dict[str, Any]:
             return resp.json()
         return {"status": "success", "http_status": resp.status_code}
     except RequestException as e:
-        msg = f"Graph POST request failed: HTTP {getattr(e.response, 'status_code', 'n/a')} - {e}"
+        resp = getattr(e, "response", None)
+        detail = ""
+        if resp is not None:
+            try:
+                detail = resp.text
+            except Exception:
+                detail = ""
+        msg = (
+            f"Graph POST request failed: HTTP {getattr(resp, 'status_code', 'n/a')} - {e}"
+        )
+        if detail:
+            msg += f" | response: {detail}"
         raise McpError(
             ErrorData(
                 code=INTERNAL_ERROR,
@@ -251,6 +266,21 @@ def azure_create_user(upn: str, display_name: str, password: str) -> Dict[str, A
     url = f"{GRAPH_BASE}/users"
     created = _graph_post(url, body)
 
+    # Immediately assign Microsoft 365 Business Standard by default
+    user_id = created.get("id")
+    license_result: Dict[str, Any] | None = None
+    if user_id:
+        try:
+            _assign_business_standard_license(user_id=user_id)
+            license_result = {"status": "success", "skuId": BUSINESS_STANDARD_SKU}
+        except Exception as exc:
+            # Surface the error but do not swallow the created user
+            license_result = {
+                "status": "failed",
+                "skuId": BUSINESS_STANDARD_SKU,
+                "error": str(exc),
+            }
+
     fields_to_keep = [
         "id",
         "displayName",
@@ -258,7 +288,10 @@ def azure_create_user(upn: str, display_name: str, password: str) -> Dict[str, A
         "mailNickname",
         "accountEnabled",
     ]
-    return {k: v for k, v in created.items() if k in fields_to_keep}
+    response = {k: v for k, v in created.items() if k in fields_to_keep}
+    if license_result:
+        response["license_assignment"] = license_result
+    return response
 
 
 @mcp.tool()
@@ -384,7 +417,7 @@ def azure_reset_user_password(
 def azure_grant_app_access(
     user_upn: str,
     app_object_id: str,
-    app_role_id: str = "00000000-0000-0000-0000-000000000000",
+    app_role_id: str | None = None,
 ) -> Dict[str, Any]:
     """
     Grant a user access to an application by creating an app role assignment.
@@ -413,10 +446,35 @@ def azure_grant_app_access(
             )
         )
 
+    # Determine a valid app role id; if none provided, pick the first enabled role for users
+    role_id = app_role_id
+    if not role_id:
+        sp = _graph_get(f"{GRAPH_BASE}/servicePrincipals/{app_object_id}")
+        roles = sp.get("appRoles", []) if isinstance(sp, dict) else []
+        candidate = next(
+            (
+                r
+                for r in roles
+                if r.get("isEnabled") and "User" in (r.get("allowedMemberTypes") or [])
+            ),
+            None,
+        )
+        if not candidate:
+            raise McpError(
+                ErrorData(
+                    code=INVALID_PARAMS,
+                    message=(
+                        f"No enabled user appRole found for app {app_object_id}. "
+                        "Specify a valid app_role_id."
+                    ),
+                )
+            )
+        role_id = candidate.get("id")
+
     assignment_body = {
         "principalId": user_id,
         "resourceId": app_object_id,
-        "appRoleId": app_role_id,
+        "appRoleId": role_id,
     }
 
     created = _graph_post(
@@ -428,6 +486,64 @@ def azure_grant_app_access(
         "message": f"Granted app access for user {user_upn} to app {app_object_id}.",
         "assignment": created,
     }
+
+
+@mcp.tool()
+def azure_grant_app_access_by_name(
+    user_upn: str,
+    app_name: str,
+    app_role_id: str | None = None,
+) -> Dict[str, Any]:
+    """
+    Convenience helper to grant app access by application display name.
+
+    Resolves the service principal by displayName prefix match and delegates to
+    azure_grant_app_access. If multiple apps match, returns an error with the
+    candidate list so the caller can disambiguate.
+
+    Args:
+        user_upn: User principal name.
+        app_name: Application display name (prefix match).
+        app_role_id: Optional app role id; if omitted, first enabled user role is used.
+    """
+    if not user_upn or not app_name:
+        raise McpError(
+            ErrorData(
+                code=INVALID_PARAMS,
+                message="Parameters 'user_upn' and 'app_name' are required.",
+            )
+        )
+
+    params = {
+        "$filter": f"startswith(displayName,'{app_name}')",
+        "$select": "id,displayName",
+    }
+    resp = _graph_get(f"{GRAPH_BASE}/servicePrincipals", params=params)
+    items = resp.get("value", []) if isinstance(resp, dict) else []
+
+    if not items:
+        raise McpError(
+            ErrorData(
+                code=INVALID_PARAMS,
+                message=f"No application found matching '{app_name}'.",
+            )
+        )
+    if len(items) > 1 and not any(sp["displayName"] == app_name for sp in items):
+        names = [f"{sp.get('displayName')} ({sp.get('id')})" for sp in items]
+        raise McpError(
+            ErrorData(
+                code=INVALID_PARAMS,
+                message=(
+                    "Multiple applications matched; please specify one of: "
+                    + "; ".join(names)
+                ),
+            )
+        )
+
+    # choose exact match if present, else first
+    chosen = next((sp for sp in items if sp.get("displayName") == app_name), items[0])
+    app_object_id = chosen.get("id")
+    return azure_grant_app_access(user_upn=user_upn, app_object_id=app_object_id, app_role_id=app_role_id)
 
 
 @mcp.tool()
@@ -551,6 +667,75 @@ def azure_find_apps(app_name: str) -> Dict[str, Any]:
     items = resp.get("value", []) if isinstance(resp, dict) else []
 
     return {"count": len(items), "apps": items}
+
+
+def _assign_business_standard_license(
+    user_id: str | None = None, user_upn: str | None = None
+) -> Dict[str, Any]:
+    """
+    Internal helper to assign Microsoft 365 Business Standard (or override SKU) to a user.
+    """
+    if not user_id:
+        if not user_upn:
+            raise McpError(
+                ErrorData(
+                    code=INVALID_PARAMS,
+                    message="Provide user_id or user_upn to assign a license.",
+                )
+            )
+        user = _graph_get(f"{GRAPH_BASE}/users/{user_upn}")
+        user_id = user.get("id")
+    if not user_id:
+        raise McpError(
+            ErrorData(
+                code=INTERNAL_ERROR,
+                message="Could not resolve user for license assignment.",
+            )
+        )
+
+    body = {
+        "addLicenses": [{"skuId": BUSINESS_STANDARD_SKU}],
+        "removeLicenses": [],
+    }
+    return _graph_post(f"{GRAPH_BASE}/users/{user_id}/assignLicense", body)
+
+
+@mcp.tool()
+def azure_assign_business_standard_license(
+    user_upn: str, sku_id: str | None = None
+) -> Dict[str, Any]:
+    """
+    Assign Microsoft 365 Business Standard to a user (override SKU via sku_id if needed).
+
+    Args:
+        user_upn: User principal name.
+        sku_id: Optional SKU GUID; defaults to BUSINESS_STANDARD_SKU env or compiled default.
+    """
+    global BUSINESS_STANDARD_SKU
+    effective_sku = sku_id or BUSINESS_STANDARD_SKU
+    if sku_id:
+        BUSINESS_STANDARD_SKU = sku_id  # cache for subsequent calls
+
+    # Resolve user to object ID
+    user = _graph_get(f"{GRAPH_BASE}/users/{user_upn}")
+    user_id = user.get("id")
+    if not user_id:
+        raise McpError(
+            ErrorData(
+                code=INTERNAL_ERROR,
+                message=f"Could not resolve user ID for '{user_upn}'.",
+            )
+        )
+
+    body = {"addLicenses": [{"skuId": effective_sku}], "removeLicenses": []}
+    result = _graph_post(f"{GRAPH_BASE}/users/{user_id}/assignLicense", body)
+
+    return {
+        "status": "success",
+        "message": f"Assigned Business Standard license to {user_upn}.",
+        "skuId": effective_sku,
+        "graph_result": result,
+    }
 
 
 # ---------------------------------------------------------------------------
