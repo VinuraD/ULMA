@@ -183,21 +183,15 @@ def db_tool():
     db_path=get_db_path()
     if not os.path.exists(db_path):
         sqlite3.connect(db_path).close()
-    conf=[McpToolset(
-            connection_params=StdioConnectionParams(
-                server_params=StdioServerParameters(
-                    command="npx",
-                    args=[
-                        "-y",
-                        "@modelcontextprotocol/server-sqlite",
-                        db_path,
-                    ],
-                )
-            ),
-            
-        )]
 
-    return conf
+    # Return only JSON-serializable metadata to avoid deepcopy/pickling errors in the ADK
+    # pipeline. Returning the McpToolset instance leaks file handles (TextIOWrapper) which
+    # breaks Pydantic deep copies.
+    return {
+        "status": "ready",
+        "db_path": db_path,
+        "message": "Local SQLite DB ensured; MCP toolset not returned to keep output JSON-safe.",
+    }
     
 
 

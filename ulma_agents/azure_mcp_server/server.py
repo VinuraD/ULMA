@@ -380,6 +380,179 @@ def azure_reset_user_password(
     }
 
 
+@mcp.tool()
+def azure_grant_app_access(
+    user_upn: str,
+    app_object_id: str,
+    app_role_id: str = "00000000-0000-0000-0000-000000000000",
+) -> Dict[str, Any]:
+    """
+    Grant a user access to an application by creating an app role assignment.
+
+    Args:
+        user_upn: User principal name, e.g. "john@contoso.com".
+        app_object_id: The application's object ID (resourceId).
+        app_role_id: The app role GUID. Default is the "default" app role (all zeroes).
+    """
+    if not user_upn or not app_object_id:
+        raise McpError(
+            ErrorData(
+                code=INVALID_PARAMS,
+                message="Parameters 'user_upn' and 'app_object_id' are required.",
+            )
+        )
+
+    # Resolve user to object ID
+    user = _graph_get(f"{GRAPH_BASE}/users/{user_upn}")
+    user_id = user.get("id")
+    if not user_id:
+        raise McpError(
+            ErrorData(
+                code=INTERNAL_ERROR,
+                message=f"Could not resolve user ID for '{user_upn}'.",
+            )
+        )
+
+    assignment_body = {
+        "principalId": user_id,
+        "resourceId": app_object_id,
+        "appRoleId": app_role_id,
+    }
+
+    created = _graph_post(
+        f"{GRAPH_BASE}/users/{user_id}/appRoleAssignments", assignment_body
+    )
+
+    return {
+        "status": "success",
+        "message": f"Granted app access for user {user_upn} to app {app_object_id}.",
+        "assignment": created,
+    }
+
+
+@mcp.tool()
+def azure_revoke_app_access(
+    user_upn: str,
+    app_object_id: str | None = None,
+    assignment_id: str | None = None,
+) -> Dict[str, Any]:
+    """
+    Revoke a user's access to an application by deleting the app role assignment.
+
+    Args:
+        user_upn: User principal name.
+        app_object_id: The application's object ID; used to locate the assignment if assignment_id not given.
+        assignment_id: Specific appRoleAssignment ID to delete (preferred).
+    """
+    if not user_upn:
+        raise McpError(
+            ErrorData(
+                code=INVALID_PARAMS,
+                message="Parameter 'user_upn' is required.",
+            )
+        )
+
+    # Resolve user to object ID
+    user = _graph_get(f"{GRAPH_BASE}/users/{user_upn}")
+    user_id = user.get("id")
+    if not user_id:
+        raise McpError(
+            ErrorData(
+                code=INTERNAL_ERROR,
+                message=f"Could not resolve user ID for '{user_upn}'.",
+            )
+        )
+
+    target_assignment_id = assignment_id
+
+    # If we weren't given a specific assignment ID, try to find one by app_object_id
+    if not target_assignment_id:
+        if not app_object_id:
+            raise McpError(
+                ErrorData(
+                    code=INVALID_PARAMS,
+                    message="Provide either 'assignment_id' or 'app_object_id'.",
+                )
+            )
+        assignments = _graph_get(f"{GRAPH_BASE}/users/{user_id}/appRoleAssignments")
+        items = assignments.get("value", []) if isinstance(assignments, dict) else []
+        match = next(
+            (item for item in items if item.get("resourceId") == app_object_id), None
+        )
+        if not match:
+            raise McpError(
+                ErrorData(
+                    code=INVALID_PARAMS,
+                    message=(
+                        f"No app role assignment found for user '{user_upn}' "
+                        f"and app '{app_object_id}'."
+                    ),
+                )
+            )
+        target_assignment_id = match.get("id")
+
+    _graph_delete(
+        f"{GRAPH_BASE}/users/{user_id}/appRoleAssignments/{target_assignment_id}"
+    )
+
+    return {
+        "status": "success",
+        "message": (
+            f"Revoked app access for user {user_upn}; "
+            f"assignment_id={target_assignment_id}."
+        ),
+    }
+
+
+@mcp.tool()
+def azure_find_groups(group_name: str) -> Dict[str, Any]:
+    """
+    Find Azure AD groups by display name (prefix match).
+
+    Args:
+        group_name: Partial or full display name to search (prefix).
+    """
+    if not group_name:
+        raise McpError(
+            ErrorData(
+                code=INVALID_PARAMS,
+                message="Parameter 'group_name' is required.",
+            )
+        )
+
+    params = {"$filter": f"startswith(displayName,'{group_name}')", "$select": "id,displayName,mailNickname"}
+    resp = _graph_get(f"{GRAPH_BASE}/groups", params=params)
+    items = resp.get("value", []) if isinstance(resp, dict) else []
+
+    return {"count": len(items), "groups": items}
+
+
+@mcp.tool()
+def azure_find_apps(app_name: str) -> Dict[str, Any]:
+    """
+    Find enterprise applications (service principals) by display name (prefix match).
+
+    Args:
+        app_name: Partial or full display name to search (prefix).
+    """
+    if not app_name:
+        raise McpError(
+            ErrorData(
+                code=INVALID_PARAMS,
+                message="Parameter 'app_name' is required.",
+            )
+        )
+
+    params = {
+        "$filter": f"startswith(displayName,'{app_name}')",
+        "$select": "id,appId,displayName",
+    }
+    resp = _graph_get(f"{GRAPH_BASE}/servicePrincipals", params=params)
+    items = resp.get("value", []) if isinstance(resp, dict) else []
+
+    return {"count": len(items), "apps": items}
+
+
 # ---------------------------------------------------------------------------
 # SSE transport wiring (compatible with Google ADK MCPToolset)
 # ---------------------------------------------------------------------------
@@ -400,6 +573,9 @@ async def handle_sse(request: Request) -> None:
             writer,
             _server.create_initialization_options(),
         )
+    # Starlette expects a Response; return an empty one to avoid NoneType errors on disconnect
+    from starlette.responses import Response
+    return Response()
 
 
 app = Starlette(
