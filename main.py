@@ -2,8 +2,12 @@ import asyncio
 import os
 import ulma_agents
 from google.genai import types
+import warnings
 
 async def main():
+    
+# Suppress all UserWarnings
+    warnings.filterwarnings("ignore", category=UserWarning)
     agent=ulma_agents.agent_sessions(ulma_agents.front_agent)
     print("Welcome to the ULMA Agent CLI! Type 'exit' or 'quit' to leave.")
     while True:
