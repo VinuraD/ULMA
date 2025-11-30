@@ -39,6 +39,7 @@ async def main():
                         and event.content.parts[0].text
                     ):
                         print(f"Agent-ULMA> ", event.content.parts[0].text)
+                        # print(f"Agent-ULMA> ", event.content.parts[0])
 
 
 if __name__ == "__main__":
