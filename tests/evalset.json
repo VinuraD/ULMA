@@ -36,7 +36,7 @@
           "final_response": {
             "parts": [
               {
-                "text": "Offboarding request received for Adam Smith. Require confirmation to proceed."
+                "text": "Approval request sent to manager for offboarding Adam Smith."
               }
             ]
           }
