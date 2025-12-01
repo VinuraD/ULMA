@@ -6,6 +6,12 @@ It leverages the **Google Agent Development Kit (ADK)** and **Google Gemini Mode
 
 ---
 
+## Architecture
+
+![ULMA Architecture](Overall_Summary.png)
+
+---
+
 ## Highlights for Course Submission
 - **Multi-agent system:** Front → Supervisor → Policy, Identity, Teams, and Remote Branch agents; includes delegation to Branch B (A2A).
 - **Tools:** MCP (Azure MCP server + SQLite), custom tools for policy reading/approvals/logging, ADK built-ins.
