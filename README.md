@@ -46,8 +46,11 @@ It leverages the **Google Agent Development Kit (ADK)** and **Google Gemini Mode
     ```
 
 3.  **Configuration:**
-    *   Create a `.env` file in `ulma_agents/` (or root) if you need to override default database paths or API keys.
+    *   Create a `.env` file in `ulma_agents/` to setup API keys.
     *   Ensure you have authentication set up for Google Cloud (e.g., `gcloud auth application-default login`) or set `GOOGLE_API_KEY`.
+    * Similarly, create an `.env` file in `azure_mcp_server/` to setup Azure/Entra ID related credentials (this is required by the agent to properly run).
+    * It should have keys; `AZURE_TENANT_ID`,`AZURE_CLIENT_ID`,`AZURE_CLIENT_SECRET`.
+    * The `azure_mcp_server/` should be run on a different terminal, using `.\server.bat` (Windows). 
 
 4.  **Initialize Database:**
     Run the database creation script to set up the local SQLite tables (`users` and `agent_memory`):
@@ -59,7 +62,7 @@ It leverages the **Google Agent Development Kit (ADK)** and **Google Gemini Mode
 
 ## ▶️ Usage
 
-Start the agent CLI:
+Start the agent CLI (Windows):
 ```bash
 .\start.bat
 ```
@@ -105,7 +108,7 @@ d:\ULMA\ULMA\
 │   │   ├── teams_agent.py  # Handles Logging & Reporting
 │   │   └── remote_agent.py # Simulates external branch A2A
 │   └── policy/             # PDF Policy documents
-└── azure_mcp_server/       # (Optional) Standalone MCP server components
+└── azure_mcp_server/       # MCP server components
 ```
 
 ---
@@ -119,12 +122,6 @@ ULMA uses a dual-layer memory approach:
     *   State is persisted automatically after every turn or critical tool usage.
 
 ---
-
-## 🤝 Contributing
-
-1.  Fork the repo.
-2.  Create a feature branch.
-3.  Submit a Pull Request.
 
 ---
 *Built with Google ADK & Gemini.*
