@@ -9,7 +9,7 @@ from .config import config
 from .sub_agents.policy_agent import policy_agent
 from .sub_agents.identity_agent import identity_agent
 from .sub_agents.teams_agent import teams_agent
-from .sub_agents.remote_agent import remote_agent
+from .branch_b.client_agent import remote_branch_agent
 from .tools import (
     save_flow_log,
     get_all_steps_status,
@@ -17,6 +17,7 @@ from .tools import (
     get_approval_status,
     queue_high_risk_approval,
     check_approval_status,
+    lookup_user_location,
 )
 
 agent = Agent(
@@ -29,8 +30,14 @@ agent = Agent(
     **Core Workflow:**
     1. **Validate & Categorize:** Ensure input has 'goal' (Onboard/Offboard/Access/etc.), 'user_name', and 'policy_doc'. Check 'db_tool'.
     
-    2. **Check Scope:**
-       - If request is for "Branch B" or user not in local DB: Delegate to 'remote_branch_agent'. Wait for success. Skip to Reporting.
+    2. **Check Scope (A2A Routing):**
+       - Call `lookup_user_location(user_name)` to check if the user belongs to a remote branch.
+       - **If location == "Branch B"**:
+         - **STOP local execution.**
+         - Delegate the task immediately to `branch_b_agent`.
+         - Pass the instruction clearly: "Update role for [user_name] to [role]".
+         - Wait for the remote agent to confirm success.
+         - Once confirmed, proceed to Reporting.
     
     3. **Handle High-Risk Actions (Offboard/Delete/Remove):**
        - **CRITICAL SAFETY CHECK:** If the user request contains ANY of these words: "delete", "offboard", "remove", "offload":
@@ -56,12 +63,12 @@ agent = Agent(
        - If not approved, stop and wait for the next input. Do NOT call identity/teams/remote until approved.
 
     5. **Reporting:**
-       - After successful execution (Onboarding, Offboarding, Access changes), call 'teams_agent' with instruction: "Send a summary to the manager about [operation] for [user_name]".
+       - After successful execution (Onboarding, Offboarding, Access changes, or Remote Ops), call 'teams_agent' with instruction: "Send a summary to the manager about [operation] for [user_name]".
        - This writes to logs/teams/incoming/summaries.
 
     6. **Final Status:** Return SUCCESS/FAILURE to 'front_agent'.
     ''',
-    sub_agents=[identity_agent, teams_agent, policy_agent, remote_agent],
+    sub_agents=[identity_agent, teams_agent, policy_agent, remote_branch_agent],
     # max_iterations=2,
     tools=[
         FunctionTool(db_tool),
@@ -70,6 +77,7 @@ agent = Agent(
         FunctionTool(get_approval_status),
         FunctionTool(queue_high_risk_approval),
         FunctionTool(check_approval_status),
+        FunctionTool(lookup_user_location),
     ],
     output_key='supervisor_updates'
 )

@@ -1,0 +1,18 @@
+[
+  {
+    "id": "bb_001",
+    "name": "Adam Smith",
+    "email": "adam.smith@branch-b.ulma.com",
+    "role": "Intern",
+    "branch": "Branch B",
+    "last_updated": "2025-12-01T06:58:15.320616Z",
+    "updated_by": "Branch B Autonomous Agent"
+  },
+  {
+    "id": "bb_002",
+    "name": "Eve Doe",
+    "email": "eve.doe@branch-b.ulma.com",
+    "role": "Admin",
+    "branch": "Branch B"
+  }
+]

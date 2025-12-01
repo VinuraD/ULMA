@@ -471,6 +471,16 @@ def db_tool():
         "db_path": db_path,
         "message": "Local SQLite DB ensured; MCP toolset not returned to keep output JSON-safe.",
     }
-    
+
+def lookup_user_location(user_name: str) -> Dict[str, str]:
+    """
+    HQ Tool: Checks the global directory to find which branch a user belongs to.
+    This simulates a corporate directory lookup.
+    """
+    # Mock directory service
+    remote_users = ["Adam Smith", "Eve Doe"]
+    if any(u.lower() == user_name.lower() for u in remote_users):
+        return {"user": user_name, "location": "Branch B", "status": "remote"}
+    return {"user": user_name, "location": "HQ", "status": "local"}
 
 
