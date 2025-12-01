@@ -6,6 +6,21 @@ It leverages the **Google Agent Development Kit (ADK)** and **Google Gemini Mode
 
 ---
 
+## Highlights for Course Submission
+- **Multi-agent system:** Front → Supervisor → Policy, Identity, Teams, and Remote Branch agents; includes delegation to Branch B (A2A).
+- **Tools:** MCP (Azure MCP server + SQLite), custom tools for policy reading/approvals/logging, ADK built-ins.
+- **Long-running operations:** ADK pause/resume via `request_confirmation` for high-risk deletes; resumes the same invocation after human decision.
+- **Sessions & memory:** `InMemorySessionService` plus SQLite persistence for state/approvals.
+- **Context engineering:** Policy parsing and compacted state passed across agents; approval filename stored/reused across turns.
+- **Observability:** ADK `LoggingPlugin`, simulated Teams logs, Branch B local audit.
+- **Deployment:** CLI runner with resumable sessions; FastAPI server for Branch B demo.
+
+## Human-in-the-Loop Approvals (text files)
+- High-risk delete/offboard requests call `queue_high_risk_approval`, which writes an approval card to `logs/teams/incoming/approvals/approvals_<user>_<timestamp>.txt` and issues an ADK `request_confirmation` pause event.
+- Add the decision in `logs/teams/outgoing/<same filename>` containing “Approved” or “Not Approved/Rejected” plus a line with `over`.
+- The runner polls the outgoing file and resumes the same `invocation_id` with a `FunctionResponse`, proceeding only if approved; rejection or missing reply stops execution.
+- Approval status is persisted in session state, so you can restart and continue waiting.
+
 ## 🚀 Features
 
 *   **Natural Language Interface:** Chat with the agent to request IT tasks (e.g., *"Onboard Adam using the standard policy"*).
