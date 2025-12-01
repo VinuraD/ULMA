@@ -669,8 +669,98 @@ def azure_find_apps(app_name: str) -> Dict[str, Any]:
     return {"count": len(items), "apps": items}
 
 
+def _list_subscribed_skus() -> list[dict[str, Any]]:
+    """Return the tenant's subscribed SKUs."""
+    resp = _graph_get(f"{GRAPH_BASE}/subscribedSkus")
+    return resp.get("value", []) if isinstance(resp, dict) else []
+
+
+def _resolve_business_standard_sku(preferred_sku: str | None = None) -> dict[str, Any]:
+    """
+    Resolve the SKU object for Business Standard (or a preferred SKU GUID/part number).
+    """
+    skus = _list_subscribed_skus()
+    if not skus:
+        raise McpError(
+            ErrorData(
+                code=INTERNAL_ERROR,
+                message="No subscribed SKUs returned by Graph; cannot assign license.",
+            )
+        )
+
+    # If a specific skuId or skuPartNumber was provided, try to match it first.
+    if preferred_sku:
+        match = next(
+            (
+                s
+                for s in skus
+                if s.get("skuId") == preferred_sku
+                or s.get("skuPartNumber") == preferred_sku
+            ),
+            None,
+        )
+        if not match:
+            candidates = [f"{s.get('skuPartNumber')} ({s.get('skuId')})" for s in skus]
+            raise McpError(
+                ErrorData(
+                    code=INVALID_PARAMS,
+                    message=(
+                        f"Requested SKU '{preferred_sku}' not found. "
+                        f"Available: {', '.join(candidates)}"
+                    ),
+                )
+            )
+        return match
+
+    # Known Business Standard identifiers: skuPartNumber O365_BUSINESS_PREMIUM or display name contains "Business Standard"
+    match = next(
+        (
+            s
+            for s in skus
+            if s.get("skuPartNumber") == "O365_BUSINESS_PREMIUM"
+            or "Business Standard" in (s.get("skuPartNumber") or "")
+            or "Business Standard" in (s.get("prepaidUnits") and "")
+            or "Business Standard" in (s.get("displayName") or "")
+        ),
+        None,
+    )
+    if not match:
+        candidates = [f"{s.get('skuPartNumber')} ({s.get('skuId')})" for s in skus]
+        raise McpError(
+            ErrorData(
+                code=INTERNAL_ERROR,
+                message=(
+                    "Could not locate a Business Standard SKU in tenant. "
+                    f"Available SKUs: {', '.join(candidates)}"
+                ),
+            )
+        )
+    return match
+
+
+def _ensure_sku_has_capacity(sku: dict[str, Any]) -> None:
+    """Raise if the SKU has no available units."""
+    consumed = sku.get("consumedUnits", 0) or 0
+    prepaid = sku.get("prepaidUnits", {}) or {}
+    enabled = prepaid.get("enabled") or 0
+    warning = prepaid.get("warning") or 0
+    available = enabled - consumed
+    if available <= 0 and warning <= 0:
+        raise McpError(
+            ErrorData(
+                code=INTERNAL_ERROR,
+                message=(
+                    f"SKU {sku.get('skuPartNumber')} has no available licenses "
+                    f"(enabled={enabled}, consumed={consumed})."
+                ),
+            )
+        )
+
+
 def _assign_business_standard_license(
-    user_id: str | None = None, user_upn: str | None = None
+    user_id: str | None = None,
+    user_upn: str | None = None,
+    preferred_sku: str | None = None,
 ) -> Dict[str, Any]:
     """
     Internal helper to assign Microsoft 365 Business Standard (or override SKU) to a user.
@@ -693,8 +783,11 @@ def _assign_business_standard_license(
             )
         )
 
+    sku_obj = _resolve_business_standard_sku(preferred_sku or BUSINESS_STANDARD_SKU)
+    _ensure_sku_has_capacity(sku_obj)
+
     body = {
-        "addLicenses": [{"skuId": BUSINESS_STANDARD_SKU}],
+        "addLicenses": [{"skuId": sku_obj.get("skuId")}],
         "removeLicenses": [],
     }
     return _graph_post(f"{GRAPH_BASE}/users/{user_id}/assignLicense", body)
@@ -711,10 +804,8 @@ def azure_assign_business_standard_license(
         user_upn: User principal name.
         sku_id: Optional SKU GUID; defaults to BUSINESS_STANDARD_SKU env or compiled default.
     """
-    global BUSINESS_STANDARD_SKU
-    effective_sku = sku_id or BUSINESS_STANDARD_SKU
-    if sku_id:
-        BUSINESS_STANDARD_SKU = sku_id  # cache for subsequent calls
+    sku_obj = _resolve_business_standard_sku(sku_id or BUSINESS_STANDARD_SKU)
+    _ensure_sku_has_capacity(sku_obj)
 
     # Resolve user to object ID
     user = _graph_get(f"{GRAPH_BASE}/users/{user_upn}")
@@ -727,13 +818,14 @@ def azure_assign_business_standard_license(
             )
         )
 
-    body = {"addLicenses": [{"skuId": effective_sku}], "removeLicenses": []}
+    body = {"addLicenses": [{"skuId": sku_obj.get("skuId")}], "removeLicenses": []}
     result = _graph_post(f"{GRAPH_BASE}/users/{user_id}/assignLicense", body)
 
     return {
         "status": "success",
         "message": f"Assigned Business Standard license to {user_upn}.",
-        "skuId": effective_sku,
+        "skuId": sku_obj.get("skuId"),
+        "skuPartNumber": sku_obj.get("skuPartNumber"),
         "graph_result": result,
     }
 
