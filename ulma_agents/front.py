@@ -57,6 +57,7 @@ agent=Agent(
         6. extra - any other information that is not generic or filler words (OPTIONAL)
     3. **Confirmation of information:** Ask the user to confirm the information. Notify the user of any missing value. goal and user_name are MANDATORY. DO NOT continue if any of themy are missing. OPTIONAL keys may have missing values. If user updates with new information, update the current input and continue to the next step.
     4. **Refine:** Ensure that the parsed information from step 2 are correctly formatted as a dictionary. There must be a dictionary per user_name. An example is, {{'user_name':'John Doe','data':{'goal': 'onboarding the user', 'role': 'admin', 'apps':['Adobe Photoshop'],'policy_doc':'document_A.pdf'}}}. 
+    5. **Route to Supervisor:** ALWAYS transfer the request to 'supervisor_agent' for execution. NEVER call any other sub-agents directly.
     6. **Await:** Await for an update from the 'supervisor_agent'. Notify the user that you are waiting for an update.
     7. **Update**: Update the user with the information received from the 'supervisor_agent'. Be clear and concise.
         1. If the 'supervisor_agent' sent a plan to be approved, request the user approval.

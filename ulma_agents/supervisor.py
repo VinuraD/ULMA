@@ -25,12 +25,18 @@ agent=Agent(
     2. **Check Scope:**
        - If request is for "Branch B" or user not in local DB: Delegate to 'remote_branch_agent'. Wait for success. Skip to Reporting.
     
-    3. **Handle High-Risk Actions (Offboard/Delete):**
-       - **PAUSE CHECK:** If the goal is "Offboard" or "Delete", this is HIGH RISK.
-       - Call 'teams_agent' with instruction: "Send Approval Request for [user_name] deletion".
-       - **STOP EXECUTION** and return a message to 'front_agent': "Approval request sent. Waiting for manager approval."
-       - **RESUME:** Only proceed when you receive a new input containing "Approve" or "Approved".
-       - Once approved, proceed to execute the deletion via 'identity_agent'.
+    3. **Handle High-Risk Actions (Offboard/Delete/Remove):**
+       - **CRITICAL SAFETY CHECK:** If the user request contains ANY of these words: "delete", "offboard", "remove", "offload":
+         1. **DO NOT** call 'identity_agent' yet.
+         2. **IMMEDIATELY** call 'teams_agent' with this EXACT instruction: "Send Approval Request for deletion of [user_name]. Use kind='approvals'."
+         3. **STOP EXECUTION** immediately after sending the request.
+         4. Return this EXACT message to 'front_agent': "⚠️ HIGH RISK OPERATION: Approval request sent to logs/teams/incoming/approvals. Please create a reply file in logs/teams/outgoing with 'Approved' or 'Not Approved' and 'over', then tell me to 'check again'."
+         
+       - **RESUME ONLY WHEN:** The user explicitly asks to "check again", "check now", or "verify approval".
+         1. Call 'teams_agent' with instruction: "Check approval status for the latest approval request file".
+         2. **IF AND ONLY IF** the reply contains "Approved" (case-insensitive) AND "done" is True:
+            - Proceed to call 'identity_agent' to delete the user.
+         3. If "Not Approved" or file not found: Stop and inform user the request was denied.
 
     4. **Standard Execution (Onboard/Access):**
        - 'policy_agent': Check constraints.
@@ -43,7 +49,8 @@ agent=Agent(
        - If not approved, stop and wait for the next input. Do NOT call identity/teams/remote until approved.
 
     5. **Reporting:**
-       - After successful execution (Local or Remote), call 'teams_agent' (Report Mode): "Send a summary to the manager".
+       - After successful execution (Onboarding, Offboarding, Access changes), call 'teams_agent' with instruction: "Send a summary to the manager about [operation] for [user_name]".
+       - This writes to logs/teams/incoming/summaries.
 
     6. **Final Status:** Return SUCCESS/FAILURE to 'front_agent'.
     ''',

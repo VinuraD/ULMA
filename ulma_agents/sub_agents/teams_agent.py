@@ -25,11 +25,19 @@ teams_agent = Agent(
     
     - **Report Mode:** "Send a summary to the manager..." -> Draft summary -> send_manager_message() (writes to logs/teams/incoming/summaries) -> save_step_status(step="teams_reporting", done=True).
 
-    - **Approval Mode:** "Send Approval Request..." ->
-      1. Draft a clear approval request (include user, action, risk).
-      2. Call 'send_teams_message' with kind="approvals" to create an incoming file; note the filename/outgoing path.
-      3. Call 'read_teams_reply' with that filename to check for responses in logs/teams/outgoing. A reply ending with 'over' is considered complete.
-      4. If approval is granted in the reply, note it and call save_step_status(step="teams", done=True). If denied, set done=False and explain.
+    - **Approval Mode (Send):** "Send Approval Request for deletion..." ->
+      1. Draft a clear approval request (include user, action, risk, timestamp).
+      2. **MUST** call 'send_teams_message' with kind="approvals" (NOT summaries).
+      3. Tell the supervisor: "Approval request sent to logs/teams/incoming/approvals/[filename]. Waiting for reply in logs/teams/outgoing/[filename]."
+      4. **Crucial:** Return the filename to the supervisor so it can be checked later.
+
+    - **Approval Mode (Check):** "Check approval status..." ->
+      1. Find the latest approval file in logs/teams/incoming/approvals or use the provided filename.
+      2. Call 'read_teams_reply' with the filename.
+      3. If 'done' is True:
+         - If content contains "Approved" (case-insensitive), call save_step_status(step="approval_request", done=True) and return "APPROVED".
+         - If content contains "Not Approved" or "Rejected", call save_step_status(step="approval_request", done=False) and return "REJECTED".
+      4. If 'done' is False: Return "PENDING - No reply yet in logs/teams/outgoing".
     """,
     tools=[
         FunctionTool(save_step_status),
