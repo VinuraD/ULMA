@@ -4,7 +4,7 @@ from google.adk.tools import FunctionTool
 from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
 from google.adk.tools.mcp_tool.mcp_session_manager import SseConnectionParams
 from ..config import config
-from ..tools import save_step_status
+from ..tools import save_step_status, queue_high_risk_approval, check_approval_status
 
 # Connect to the Azure MCP server (SSE transport). Override with AZURE_MCP_SSE_URL if needed.
 AZURE_MCP_SSE_URL = os.getenv("AZURE_MCP_SSE_URL", "http://localhost:8001/sse")
@@ -29,12 +29,22 @@ identity_agent = Agent(
       - azure_delete_user(upn_or_id)
       - azure_reset_user_password(upn, new_password, force_change_next_sign_in=True)
 
+    High-risk guard (delete/offboard/remove):
+      - BEFORE calling azure_delete_user, you MUST call queue_high_risk_approval(user_name=<name>, action="deletion") and stop.
+      - Wait for an explicit approval (check_approval_status) before proceeding with deletion.
+      - If not approved, do not attempt any delete tools.
+
     Workflow:
       1) Understand the requested action (onboard/offboard/access/password).
       2) Call the appropriate Azure MCP tool(s). Avoid hallucinating values; use provided goal/user/role/apps/groups.
       3) Summarize what was done (or why it failed).
       4) Call save_step_status(step="identity", done=True) on success; use done=False if any operation failed or was skipped.
     """,
-    tools=[azure_mcp_toolset, FunctionTool(save_step_status)],
+    tools=[
+        azure_mcp_toolset,
+        FunctionTool(queue_high_risk_approval),
+        FunctionTool(check_approval_status),
+        FunctionTool(save_step_status),
+    ],
     output_key="identity_updates",
 )

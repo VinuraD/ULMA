@@ -342,6 +342,15 @@ def queue_high_risk_approval(
     )
     result = send_teams_message(kind="approvals", message=message, filename=base_name)
 
+    # Ask ADK to pause the run until the human decision arrives (emits adk_request_confirmation event)
+    try:
+        tool_context.request_confirmation(
+            f"Waiting for approval reply in logs/teams/outgoing/{base_name} for {action} of '{user_name}'."
+        )
+    except Exception as exc:
+        # Best-effort: even if confirmation cannot be requested, keep the file-based flow.
+        print(f"[approval] request_confirmation failed: {exc}")
+
     state = tool_context.state
     state["WAITING_FOR_APPROVAL"] = True
     state["APPROVAL_FILENAME"] = result["filename"]
