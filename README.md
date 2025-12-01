@@ -88,6 +88,23 @@ Start the agent CLI (Windows):
 .\start.bat
 ```
 
+### 🧪 Testing Remote Branch (Agent-to-Agent)
+
+To test the "Remote Delegation" scenario (Branch B), you must start the secondary agent server which simulates the remote branch's IT system.
+
+1.  **Open a new terminal window.**
+2.  **Run the Branch B Server:**
+    ```bash
+    .\start_branch_b.bat
+    ```
+    *This starts a FastAPI server on `localhost:8002` that listens for delegated tasks.*
+
+3.  **In your main terminal (CLI), ask for a remote task:**
+    ```text
+    User: "Update role for Adam Smith to Manager."
+    ```
+    *The Supervisor will detect that Adam Smith is a "Branch B" user (via `lookup_user_location`) and delegate the execution to the remote agent.*
+
 ### Example Scenarios
 
 #### 1. Standard Onboarding (Local)
@@ -100,12 +117,12 @@ Start the agent CLI (Windows):
 4.  **Teams Agent** logs the technical details and sends a summary to the manager.
 
 #### 2. Remote Delegation (Agent-to-Agent POC)
-**User:** *"Onboard John Doe for Branch B."*
+**User:** *"Update role for Adam Smith to Manager."*
 
 **Agent Workflow:**
-1.  **Supervisor** detects "Branch B" is out of local scope.
+1.  **Supervisor** calls `lookup_user_location("Adam Smith")` and detects "Branch B".
 2.  **Supervisor** delegates the task to the **Remote Branch Agent**.
-3.  **Remote Agent** confirms execution.
+3.  **Remote Agent** (Branch B) executes the role update locally.
 4.  **Teams Agent** reports the successful delegation to the manager.
 
 ---
