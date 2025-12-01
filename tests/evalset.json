@@ -1,0 +1,47 @@
+{
+  "eval_set_id": "ulma_smoke_eval",
+  "eval_cases": [
+    {
+      "eval_id": "onboard_basic",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [
+              {
+                "text": "Hi, onboard user 'Serena van der Woodsen' using the policy document 'General Policies for Onboarding_Offboarding'"
+              }
+            ]
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "Please tell me the role of the user Serena van der Woodsen."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "offboard_basic",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [
+              {
+                "text": "Please offboard Adam Smith today."
+              }
+            ]
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "Offboarding request received for Adam Smith. Require confirmation to proceed."
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

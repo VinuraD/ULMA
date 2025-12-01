@@ -1,0 +1,42 @@
+{
+    "eval_set_id": "user onboard request",
+    "eval_cases": [
+        {
+            "eval_id": "user admin",
+            "conversation": [
+                {
+                    "user_content": {
+                        "parts": [
+                            {"text": "Please onboard a new user with admin privileges."}
+                        ]
+                    },
+                    "final_response": {
+                        "parts": [
+                            {
+                                "text": "I need the new user's name, groups, and permissions to proceed with the onboarding."
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+        ,
+        {
+            "eval_id": "delete user",
+            "conversation": [
+                {
+                    "user_content": {
+                        "parts": [{"text": "Delete user TestUser123 from the system."}]
+                    },
+                    "final_response": {
+                        "parts": [
+                            {
+                                "text": "User TestUser123 has been successfully deleted from the system."
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    ]
+}

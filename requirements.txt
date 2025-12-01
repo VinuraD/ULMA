@@ -1,4 +1,5 @@
 google-adk
+google-adk[eval]
 pytest
 pytest-asyncio
 deprecated
