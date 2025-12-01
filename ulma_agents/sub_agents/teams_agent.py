@@ -34,10 +34,10 @@ teams_agent = Agent(
     - **Approval Mode (Check):** "Check approval status..." ->
       1. Find the latest approval file in logs/teams/incoming/approvals or use the provided filename.
       2. Call 'read_teams_reply' with the filename.
-      3. If 'done' is True:
-         - If content contains "Approved" (case-insensitive), call save_step_status(step="approval_request", done=True) and return "APPROVED".
-         - If content contains "Not Approved" or "Rejected", call save_step_status(step="approval_request", done=False) and return "REJECTED".
-      4. If 'done' is False: Return "PENDING - No reply yet in logs/teams/outgoing".
+      3. 'done' only becomes True when the reply contains "Approved" or "Not Approved/Rejected" AND includes a line with 'over'.
+         - If decision is "approved", call save_step_status(step="approval_request", done=True) and return "APPROVED".
+         - If decision is "rejected", call save_step_status(step="approval_request", done=False) and return "REJECTED".
+      4. If 'done' is False (missing approval keywords or 'over'): Return "PENDING - No reply yet in logs/teams/outgoing".
     """,
     tools=[
         FunctionTool(save_step_status),

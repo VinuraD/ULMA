@@ -1,4 +1,5 @@
 import os
+import re
 import glob
 import datetime
 import sqlite3
@@ -34,6 +35,16 @@ def _ensure_teams_dirs() -> Dict[str, str]:
         "incoming_summaries": incoming_summaries,
         "outgoing": outgoing,
     }
+
+
+def _slugify_name(name: str) -> str:
+    """Convert user-provided names into a filesystem-safe slug."""
+    if not name:
+        return "user"
+    slug = re.sub(r"[^a-zA-Z0-9]+", "_", name.strip().lower())
+    slug = slug.strip("_")
+    return slug or "user"
+
 
 def save_flow_log(flow_updates:str,filename:str) -> Dict:
     '''writes and saves exection updates to a log file
@@ -210,7 +221,8 @@ def send_teams_message(kind: str, message: str, filename: Optional[str] = None) 
 
 def read_teams_reply(filename: str) -> Dict[str, Any]:
     """
-    Checks for a reply file in the outgoing folder and reports completion if 'over' is present.
+    Checks for a reply file in the outgoing folder and reports completion if it contains
+    an approval decision plus the sentinel line 'over'.
 
     Args:
         filename: The base filename to look for (e.g., from send_teams_message).
@@ -233,15 +245,28 @@ def read_teams_reply(filename: str) -> Dict[str, Any]:
         content = f.read()
 
     lines = [ln.strip() for ln in content.splitlines() if ln.strip()]
-    last_line = lines[-1].lower() if lines else ""
-    done = last_line == "over" or any(ln.lower() == "over" for ln in lines)
+    lowered = "\n".join(lines).lower()
+    has_over = any(ln.lower() == "over" for ln in lines)
+    has_not_approved = "not approved" in lowered or "rejected" in lowered
+    has_approved = "approved" in lowered and not has_not_approved
+
+    decision = "pending"
+    done = False
+    reason = ""
+    if has_over and (has_approved or has_not_approved):
+        done = True
+        decision = "approved" if has_approved else "rejected"
+    else:
+        reason = "no clear approval decision or missing 'over' marker"
 
     return {
-        "status": "complete" if done else "in_progress",
+        "status": decision,
         "filename": base_name,
         "outgoing_file": outgoing_path,
         "message": content,
         "done": done,
+        "decision": decision,
+        "reason": reason,
     }
 
 
@@ -296,6 +321,90 @@ def send_manager_message(message: str) -> Dict[str, Any]:
         "file": result["incoming_file"],
         "reply_file": result["outgoing_file"],
     }
+
+
+def queue_high_risk_approval(
+    tool_context: ToolContext, user_name: str, action: str = "deletion"
+) -> Dict[str, Any]:
+    """
+    Creates an approval request file in the approvals folder and records the filename in session state.
+
+    Args:
+        user_name: Name of the user being acted on (used for filename clarity).
+        action: Description of the high-risk action (default: deletion).
+    """
+    stamp = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    slug = _slugify_name(user_name)
+    base_name = f"approvals_{slug}_{stamp}.txt"
+    message = (
+        f"High-risk {action} requested for '{user_name}'. "
+        "Reply in the outgoing folder with 'Approved' or 'Not Approved' and add a line with 'over'."
+    )
+    result = send_teams_message(kind="approvals", message=message, filename=base_name)
+
+    state = tool_context.state
+    state["WAITING_FOR_APPROVAL"] = True
+    state["APPROVAL_FILENAME"] = result["filename"]
+
+    session_id = getattr(tool_context, "session_id", None)
+    if session_id:
+        try:
+            save_session_memory(session_id, state)
+        except Exception as exc:
+            print(f"[memory] failed to persist approval filename: {exc}")
+
+    return {
+        "status": "queued",
+        "filename": result["filename"],
+        "incoming_file": result["incoming_file"],
+        "outgoing_file": result["outgoing_file"],
+        "instruction": "Reply with Approved/Not Approved and 'over' on the next line.",
+    }
+
+
+def check_approval_status(
+    tool_context: ToolContext, filename: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Checks the approval reply for the given filename (or the last queued approval in state).
+    Returns pending if no decision is present or if 'over' is missing.
+    """
+    state = tool_context.state
+    target_file = filename or state.get("APPROVAL_FILENAME")
+    if not target_file:
+        return {
+            "status": "pending",
+            "done": False,
+            "reason": "no approval filename found in state",
+        }
+
+    reply = read_teams_reply(target_file)
+    decision = reply.get("decision", "pending")
+    done = reply.get("done", False)
+    reason = reply.get("reason", "")
+
+    if done and decision in {"approved", "rejected"}:
+        state["WAITING_FOR_APPROVAL"] = False
+        state["APPROVAL_STATUS"] = "APPROVED" if decision == "approved" else "REJECTED"
+        state["APPROVAL_TS"] = datetime.datetime.utcnow().isoformat()
+    else:
+        state["WAITING_FOR_APPROVAL"] = True
+
+    session_id = getattr(tool_context, "session_id", None)
+    if session_id:
+        try:
+            save_session_memory(session_id, state)
+        except Exception as exc:
+            print(f"[memory] failed to persist approval status: {exc}")
+
+    return {
+        **reply,
+        "status": decision,
+        "done": done,
+        "reason": reason,
+        "approval_filename": target_file,
+    }
+
 
 def request_approval(tool_context: ToolContext, description: str) -> Dict[str, Any]:
     """

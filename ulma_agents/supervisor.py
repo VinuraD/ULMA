@@ -10,10 +10,17 @@ from .sub_agents.policy_agent import policy_agent
 from .sub_agents.identity_agent import identity_agent
 from .sub_agents.teams_agent import teams_agent
 from .sub_agents.remote_agent import remote_agent
-from .tools import save_flow_log, get_all_steps_status, db_tool, get_approval_status
+from .tools import (
+    save_flow_log,
+    get_all_steps_status,
+    db_tool,
+    get_approval_status,
+    queue_high_risk_approval,
+    check_approval_status,
+)
 
-agent=Agent(
-    name = 'supervisor_agent',
+agent = Agent(
+    name='supervisor_agent',
     model=config.supervisor_agent,
     description='The supervisor agent. Takes the output from the front agent and utilize the other subagents and tools to fulfill the user request',
     instruction=f'''
@@ -28,15 +35,15 @@ agent=Agent(
     3. **Handle High-Risk Actions (Offboard/Delete/Remove):**
        - **CRITICAL SAFETY CHECK:** If the user request contains ANY of these words: "delete", "offboard", "remove", "offload":
          1. **DO NOT** call 'identity_agent' yet.
-         2. **IMMEDIATELY** call 'teams_agent' with this EXACT instruction: "Send Approval Request for deletion of [user_name]. Use kind='approvals'."
+         2. **IMMEDIATELY** call tool `queue_high_risk_approval(user_name=<name>, action="deletion")` to create logs/teams/incoming/approvals/approvals_<name>_<timestamp>.txt.
          3. **STOP EXECUTION** immediately after sending the request.
-         4. Return this EXACT message to 'front_agent': "⚠️ HIGH RISK OPERATION: Approval request sent to logs/teams/incoming/approvals. Please create a reply file in logs/teams/outgoing with 'Approved' or 'Not Approved' and 'over', then tell me to 'check again'."
+         4. Return this EXACT message to 'front_agent': "HIGH RISK OPERATION: Approval request sent to logs/teams/incoming/approvals. Please create a reply file in logs/teams/outgoing with 'Approved' or 'Not Approved' and 'over', then tell me to 'check again'."
          
        - **RESUME ONLY WHEN:** The user explicitly asks to "check again", "check now", or "verify approval".
-         1. Call 'teams_agent' with instruction: "Check approval status for the latest approval request file".
-         2. **IF AND ONLY IF** the reply contains "Approved" (case-insensitive) AND "done" is True:
+         1. Call tool `check_approval_status()` (uses the stored filename from the previous step).
+         2. **IF AND ONLY IF** the decision == "approved" AND done == True:
             - Proceed to call 'identity_agent' to delete the user.
-         3. If "Not Approved" or file not found: Stop and inform user the request was denied.
+         3. If "rejected", file not found, or no decision: Stop and inform user the request was denied or is still pending.
 
     4. **Standard Execution (Onboard/Access):**
        - 'policy_agent': Check constraints.
@@ -54,12 +61,16 @@ agent=Agent(
 
     6. **Final Status:** Return SUCCESS/FAILURE to 'front_agent'.
     ''',
-    sub_agents = [identity_agent, teams_agent, policy_agent, remote_agent],
+    sub_agents=[identity_agent, teams_agent, policy_agent, remote_agent],
     # max_iterations=2,
-    tools=[FunctionTool(db_tool),
-           FunctionTool(save_flow_log),
-           FunctionTool(get_all_steps_status),
-           FunctionTool(get_approval_status)],
+    tools=[
+        FunctionTool(db_tool),
+        FunctionTool(save_flow_log),
+        FunctionTool(get_all_steps_status),
+        FunctionTool(get_approval_status),
+        FunctionTool(queue_high_risk_approval),
+        FunctionTool(check_approval_status),
+    ],
     output_key='supervisor_updates'
 )
 
